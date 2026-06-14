@@ -1,0 +1,73 @@
+/*
+Theme Name: Futbol Fest Landing
+Theme URI: https://futbolfestx.com
+Description: Tema personalizado para la landing page de Futbol Fest X
+Version: 1.0
+Author: VC Studio Perú
+Author URI: https://vcstudioperu.com
+License: GPL v2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: futbolfest-landing
+Domain Path: /languages
+Requires at least: 6.0
+Requires PHP: 7.4
+*/
+
+/* Global Styles */
+:root {
+	--color-primary: #1e3a8a;
+	--color-secondary: #fbbf24;
+	--color-text: #1f2937;
+	--color-light: #f8fafc;
+	--color-border: #e2e8f0;
+}
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+body {
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto Mono', sans-serif;
+	color: var(--color-text);
+	line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+/* Blocks */
+.wp-block-button__link {
+	border-radius: 0.5rem;
+	font-weight: 600;
+	transition: all 0.3s ease;
+}
+
+.wp-block-button__link:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+.wp-block-image img {
+	border-radius: 0.5rem;
+	max-width: 100%;
+	height: auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+	h1 {
+		font-size: 2rem !important;
+	}
+
+	h2 {
+		font-size: 1.75rem !important;
+	}
+
+	.wp-block-columns {
+		flex-direction: column;
+	}
+}

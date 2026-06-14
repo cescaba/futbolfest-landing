@@ -20,7 +20,7 @@ jobs:
           user: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASSWORD }}
           localDir: ./
-          remoteDir: /wp-content/themes/futbolfest-landing/
+          remoteDir: /
           protocol: ftp
           port: 21
           dryRun: false

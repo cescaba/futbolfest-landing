@@ -133,6 +133,31 @@
 			"name": "footer",
 			"title": "Footer",
 			"area": "footer"
+		},
+		{
+			"name": "hero",
+			"title": "Hero",
+			"area": "uncategorized"
+		},
+		{
+			"name": "registro",
+			"title": "Registro",
+			"area": "uncategorized"
+		},
+		{
+			"name": "actividades",
+			"title": "Actividades",
+			"area": "uncategorized"
+		},
+		{
+			"name": "ubicacion",
+			"title": "Ubicación",
+			"area": "uncategorized"
+		},
+		{
+			"name": "contacto",
+			"title": "Contacto",
+			"area": "uncategorized"
 		}
 	]
 }

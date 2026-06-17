@@ -1,0 +1,100 @@
+<!-- REGISTRO SECTION -->
+<section id="registro" class="general-section registro-section">
+	<div class="registro-card">
+		<div class="registro-content">
+			<div class="registro-card-header">
+				<svg class="registro-card-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+					<path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+				</svg>
+				<span>REGISTRO</span>
+			</div>
+
+			<h2 class="registro-heading">
+				<span class="registro-heading-main">ÚNETE AL</span>
+				<span class="registro-heading-accent">FÚTBOL FEST</span>
+			</h2>
+			<p class="registro-description">Completa el formulario. Todos los campos son obligatorios.</p>
+
+			<form class="registro-form" action="#" method="post" data-futbolfest-registro-form>
+				<label class="registro-honeypot" aria-hidden="true" tabindex="-1">
+					<span>No completar este campo</span>
+					<input type="text" name="sitio_web" autocomplete="off" tabindex="-1">
+				</label>
+
+				<div class="registro-form-grid">
+					<label class="registro-field">
+						<span>
+							<svg class="registro-field-icon" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+								<path d="M6 6C7.38071 6 8.5 4.88071 8.5 3.5C8.5 2.11929 7.38071 1 6 1C4.61929 1 3.5 2.11929 3.5 3.5C3.5 4.88071 4.61929 6 6 6Z" fill="currentColor"/>
+								<path d="M2 11C2 8.79086 3.79086 7 6 7C8.20914 7 10 8.79086 10 11H2Z" fill="currentColor"/>
+							</svg>
+							Nombre
+						</span>
+						<input type="text" name="nombre" required>
+					</label>
+
+					<label class="registro-field">
+						<span>
+							<svg class="registro-field-icon" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+								<path d="M6 6C7.38071 6 8.5 4.88071 8.5 3.5C8.5 2.11929 7.38071 1 6 1C4.61929 1 3.5 2.11929 3.5 3.5C3.5 4.88071 4.61929 6 6 6Z" fill="currentColor"/>
+								<path d="M2 11C2 8.79086 3.79086 7 6 7C8.20914 7 10 8.79086 10 11H2Z" fill="currentColor"/>
+							</svg>
+							Apellido
+						</span>
+						<input type="text" name="apellido" required>
+					</label>
+
+					<label class="registro-field">
+						<span>
+							<svg class="registro-field-icon" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+								<path d="M2 2H10V10H2V2ZM3 3V9H9V3H3Z" fill="currentColor"/>
+								<path d="M4 4H8V5H4V4ZM4 6H8V7H4V6ZM4 8H6.5V9H4V8Z" fill="currentColor"/>
+							</svg>
+							DNI
+						</span>
+						<input type="text" name="dni" required>
+					</label>
+
+					<label class="registro-field">
+						<span>
+							<svg class="registro-field-icon" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+								<path d="M3.191 1.5L4.454 1.5C4.711 1.5 4.934 1.678 4.991 1.929L5.314 3.349C5.366 3.576 5.268 3.81 5.066 3.927L4.245 4.405C4.717 5.384 5.516 6.183 6.495 6.655L6.973 5.834C7.09 5.632 7.324 5.534 7.551 5.586L8.971 5.909C9.222 5.966 9.4 6.189 9.4 6.446V7.709C9.4 8.144 9.048 8.5 8.613 8.485C5.778 8.386 3.514 6.122 3.415 3.287C3.4 2.852 3.756 2.5 4.191 2.5H3.191V1.5Z" fill="currentColor"/>
+							</svg>
+							Teléfono
+						</span>
+						<input type="tel" name="telefono" required>
+					</label>
+
+					<label class="registro-field registro-field-full">
+						<span>
+							<svg class="registro-field-icon" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+								<path d="M1.5 3C1.5 2.44772 1.94772 2 2.5 2H9.5C10.0523 2 10.5 2.44772 10.5 3V9C10.5 9.55228 10.0523 10 9.5 10H2.5C1.94772 10 1.5 9.55228 1.5 9V3ZM2.5 3L6 5.625L9.5 3H2.5ZM9.5 4.25L6.3 6.65C6.12222 6.78333 5.87778 6.78333 5.7 6.65L2.5 4.25V9H9.5V4.25Z" fill="currentColor"/>
+							</svg>
+							Correo Electrónico
+						</span>
+						<input type="email" name="email" required>
+					</label>
+				</div>
+
+				<button type="submit" class="btn btn-primary registro-submit">
+					<svg class="registro-submit-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+						<circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1"/>
+						<circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1"/>
+						<circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1"/>
+						<circle cx="8" cy="8" r="0.8" fill="currentColor"/>
+					</svg>
+					<span>REGISTRARSE AHORA</span>
+				</button>
+				<p class="registro-footer">Registro gratuito · Cupos limitados</p>
+				<p class="registro-message" data-futbolfest-registro-message aria-live="polite"></p>
+			</form>
+		</div>
+
+		<div class="registro-visual">
+			<img src="/wp-content/themes/futbolfest-landing/assets/images/Container.png" alt="Futbol Fest registro">
+		</div>
+	</div>
+
+	<!-- REGISTRO CONFIRMACION -->
+	<!-- wp:template-part {"slug":"registro-confirmacion"} /-->
+</section>

@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Schema version for future registration table migrations.
  */
-const FUTBOLFEST_REGISTRO_SCHEMA_VERSION = '1.0.0';
+const FUTBOLFEST_REGISTRO_SCHEMA_VERSION = '1.1.0';
 const FUTBOLFEST_REGISTRO_MIN_SUBMIT_SECONDS = 2;
 const FUTBOLFEST_REGISTRO_RATE_LIMIT_MINUTE = 120;
 const FUTBOLFEST_REGISTRO_RATE_LIMIT_HOUR = 3000;
@@ -49,10 +49,12 @@ function futbolfest_registro_table_schema() {
 		dni varchar(20) NOT NULL,
 		telefono varchar(30) NOT NULL,
 		email varchar(190) NOT NULL,
+		origen varchar(20) NOT NULL DEFAULT 'home',
 		created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY  (id),
 		KEY email (email),
 		KEY dni (dni),
+		KEY origen (origen),
 		KEY created_at (created_at)
 	) {$charset_collate};";
 }
@@ -258,6 +260,8 @@ function futbolfest_registro_handle_submission() {
 	$dni      = futbolfest_registro_post_text( 'dni' );
 	$telefono = futbolfest_registro_post_text( 'telefono' );
 	$email    = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+	$origen   = futbolfest_registro_post_text( 'origen' );
+	$origen   = in_array( $origen, array( 'home', 'qr' ), true ) ? $origen : 'home';
 
 	if ( '' === $nombre || '' === $apellido || '' === $dni || '' === $telefono || '' === $email ) {
 		wp_send_json_error(
@@ -303,8 +307,9 @@ function futbolfest_registro_handle_submission() {
 			'dni'      => $dni,
 			'telefono' => $telefono,
 			'email'    => $email,
+			'origen'   => $origen,
 		),
-		array( '%s', '%s', '%s', '%s', '%s' )
+		array( '%s', '%s', '%s', '%s', '%s', '%s' )
 	);
 
 	if ( false === $inserted ) {
@@ -340,6 +345,21 @@ function futbolfest_registro_admin_menu() {
 add_action( 'admin_menu', 'futbolfest_registro_admin_menu' );
 
 /**
+ * Returns a readable label for a registration source.
+ *
+ * @param string $origen Registration source.
+ * @return string
+ */
+function futbolfest_registro_origen_label( $origen ) {
+	$labels = array(
+		'home' => 'Home',
+		'qr'   => 'QR',
+	);
+
+	return isset( $labels[ $origen ] ) ? $labels[ $origen ] : 'Home';
+}
+
+/**
  * Renders the registrations admin table.
  *
  * @return void
@@ -357,22 +377,54 @@ function futbolfest_registro_render_admin_page() {
 	$per_page    = 50;
 	$current     = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
 	$offset      = ( $current - 1 ) * $per_page;
-	$total_items = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$origen      = isset( $_GET['origen'] ) ? sanitize_key( wp_unslash( $_GET['origen'] ) ) : '';
+	$origen      = in_array( $origen, array( 'home', 'qr' ), true ) ? $origen : '';
+	$count_home  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name} WHERE origen = 'home'" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$count_qr    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name} WHERE origen = 'qr'" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$count_total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$total_items = $origen ? ( 'qr' === $origen ? $count_qr : $count_home ) : $count_total;
 	$total_pages = max( 1, (int) ceil( $total_items / $per_page ) );
-	$rows        = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT id, nombre, apellido, dni, telefono, email, created_at FROM {$table_name} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$per_page,
-			$offset
-		)
-	);
-	$export_url  = wp_nonce_url(
-		admin_url( 'admin-post.php?action=futbolfest_registro_export' ),
+	$query       = "SELECT id, nombre, apellido, dni, telefono, email, origen, created_at FROM {$table_name}"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$args        = array();
+
+	if ( $origen ) {
+		$query .= ' WHERE origen = %s';
+		$args[] = $origen;
+	}
+
+	$query .= ' ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d';
+	$args[] = $per_page;
+	$args[] = $offset;
+
+	$rows       = $wpdb->get_results( $wpdb->prepare( $query, $args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	$export_url = wp_nonce_url(
+		add_query_arg(
+			array_filter(
+				array(
+					'action' => 'futbolfest_registro_export',
+					'origen' => $origen,
+				)
+			),
+			admin_url( 'admin-post.php' )
+		),
 		'futbolfest_registro_export'
 	);
+	$base_url   = admin_url( 'admin.php?page=futbolfest-registros' );
 	?>
 	<div class="wrap">
 		<h1>Registros Futbol Fest</h1>
+
+		<h2 class="nav-tab-wrapper">
+			<a class="nav-tab <?php echo '' === $origen ? 'nav-tab-active' : ''; ?>" href="<?php echo esc_url( $base_url ); ?>">
+				Todos <span class="count">(<?php echo esc_html( number_format_i18n( $count_total ) ); ?>)</span>
+			</a>
+			<a class="nav-tab <?php echo 'home' === $origen ? 'nav-tab-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( 'origen', 'home', $base_url ) ); ?>">
+				Home <span class="count">(<?php echo esc_html( number_format_i18n( $count_home ) ); ?>)</span>
+			</a>
+			<a class="nav-tab <?php echo 'qr' === $origen ? 'nav-tab-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( 'origen', 'qr', $base_url ) ); ?>">
+				QR <span class="count">(<?php echo esc_html( number_format_i18n( $count_qr ) ); ?>)</span>
+			</a>
+		</h2>
 
 		<p>
 			<a class="button button-primary" href="<?php echo esc_url( $export_url ); ?>">Descargar CSV</a>
@@ -391,13 +443,14 @@ function futbolfest_registro_render_admin_page() {
 					<th>DNI</th>
 					<th>Telefono</th>
 					<th>Email</th>
+					<th>Origen</th>
 					<th>Fecha</th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php if ( empty( $rows ) ) : ?>
 					<tr>
-						<td colspan="7">Todavia no hay registros.</td>
+						<td colspan="8">Todavia no hay registros.</td>
 					</tr>
 				<?php else : ?>
 					<?php foreach ( $rows as $row ) : ?>
@@ -412,6 +465,7 @@ function futbolfest_registro_render_admin_page() {
 									<?php echo esc_html( $row->email ); ?>
 								</a>
 							</td>
+							<td><?php echo esc_html( futbolfest_registro_origen_label( $row->origen ) ); ?></td>
 							<td><?php echo esc_html( mysql2date( 'd/m/Y H:i', $row->created_at ) ); ?></td>
 						</tr>
 					<?php endforeach; ?>
@@ -459,11 +513,22 @@ function futbolfest_registro_export_csv() {
 	global $wpdb;
 
 	$table_name = futbolfest_registro_table_name();
-	$rows       = $wpdb->get_results(
-		"SELECT id, nombre, apellido, dni, telefono, email, created_at FROM {$table_name} ORDER BY created_at DESC, id DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		ARRAY_A
-	);
-	$filename   = 'futbolfest-registros-' . gmdate( 'Y-m-d-His' ) . '.csv';
+	$origen     = isset( $_GET['origen'] ) ? sanitize_key( wp_unslash( $_GET['origen'] ) ) : '';
+	$origen     = in_array( $origen, array( 'home', 'qr' ), true ) ? $origen : '';
+	$query      = "SELECT id, nombre, apellido, dni, telefono, email, origen, created_at FROM {$table_name}"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$args       = array();
+
+	if ( $origen ) {
+		$query .= ' WHERE origen = %s';
+		$args[] = $origen;
+	}
+
+	$query .= ' ORDER BY created_at DESC, id DESC';
+	$rows   = $origen
+		? $wpdb->get_results( $wpdb->prepare( $query, $args ), ARRAY_A ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		: $wpdb->get_results( $query, ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+	$filename = 'futbolfest-registros' . ( $origen ? '-' . $origen : '' ) . '-' . gmdate( 'Y-m-d-His' ) . '.csv';
 
 	while ( ob_get_level() ) {
 		ob_end_clean();
@@ -477,7 +542,7 @@ function futbolfest_registro_export_csv() {
 
 	$output = fopen( 'php://output', 'w' );
 
-	fputcsv( $output, array( 'ID', 'Nombre', 'Apellido', 'DNI', 'Telefono', 'Email', 'Fecha' ) );
+	fputcsv( $output, array( 'ID', 'Nombre', 'Apellido', 'DNI', 'Telefono', 'Email', 'Origen', 'Fecha' ) );
 
 	foreach ( $rows as $row ) {
 		fputcsv(
@@ -489,6 +554,7 @@ function futbolfest_registro_export_csv() {
 				$row['dni'],
 				$row['telefono'],
 				$row['email'],
+				futbolfest_registro_origen_label( $row['origen'] ),
 				$row['created_at'],
 			)
 		);

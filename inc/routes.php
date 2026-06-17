@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const FUTBOLFEST_ROUTES_VERSION = '1.0.0';
+const FUTBOLFEST_ROUTES_VERSION = '1.0.1';
 
 /**
  * Registers clean front-end routes owned by the theme.
@@ -18,7 +18,7 @@ const FUTBOLFEST_ROUTES_VERSION = '1.0.0';
  */
 function futbolfest_register_routes() {
 	add_rewrite_rule(
-		'^registro-qr/?$',
+		'^formulario-registro/?$',
 		'index.php?futbolfest_route=registro_qr',
 		'top'
 	);

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const TARGET_URL = 'https://futbolfestx.com/registro-qr/';
+const TARGET_URL = 'https://futbolfestx.com/formulario-registro/';
 const OUT_FILE = path.join(__dirname, '..', 'assets', 'images', 'qr-futbolfestx.svg');
 
 const VERSION = 5;

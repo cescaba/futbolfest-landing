@@ -16,6 +16,7 @@
 
 	var message = form.querySelector('[data-futbolfest-registro-message]');
 	var submit = form.querySelector('button[type="submit"]');
+	var formRenderedAt = Math.floor(Date.now() / 1000);
 
 	function setMessage(text, type) {
 		if (!message) {
@@ -40,13 +41,12 @@
 			return;
 		}
 
-		card.hidden = true;
 		confirmation.hidden = false;
 		if (section) {
 			section.dataset.registroState = 'confirmacion';
 		}
+		document.body.classList.add('futbolfest-modal-open');
 		confirmation.focus({ preventScroll: true });
-		confirmation.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
 
 	function setConfirmationName(name) {
@@ -67,6 +67,7 @@
 		if (section) {
 			section.dataset.registroState = 'formulario';
 		}
+		document.body.classList.remove('futbolfest-modal-open');
 		setMessage('', '');
 		card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
@@ -83,6 +84,7 @@
 		var submittedName = payload.get('nombre');
 		payload.append('action', 'futbolfest_registro_submit');
 		payload.append('nonce', config.nonce);
+		payload.append('form_rendered_at', formRenderedAt);
 
 		setLoading(true);
 		setMessage('Guardando registro...', 'loading');

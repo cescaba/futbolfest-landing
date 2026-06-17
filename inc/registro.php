@@ -15,6 +15,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Schema version for future registration table migrations.
  */
 const FUTBOLFEST_REGISTRO_SCHEMA_VERSION = '1.0.0';
+const FUTBOLFEST_REGISTRO_MIN_SUBMIT_SECONDS = 2;
+const FUTBOLFEST_REGISTRO_RATE_LIMIT_MINUTE = 120;
+const FUTBOLFEST_REGISTRO_RATE_LIMIT_HOUR = 3000;
+const FUTBOLFEST_REGISTRO_BOT_LOCK_SECONDS = 1800;
 
 /**
  * Returns the full database table name for registrations.
@@ -116,16 +120,133 @@ function futbolfest_registro_post_text( $key ) {
 }
 
 /**
+ * Returns a normalized client IP for abuse controls.
+ *
+ * @return string
+ */
+function futbolfest_registro_client_ip() {
+	$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
+
+	return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '0.0.0.0';
+}
+
+/**
+ * Builds transient keys without storing raw IP addresses.
+ *
+ * @param string $suffix Key suffix.
+ * @return string
+ */
+function futbolfest_registro_security_key( $suffix ) {
+	return 'ff_reg_' . md5( futbolfest_registro_client_ip() . '|' . $suffix );
+}
+
+/**
+ * Applies per-IP rate limits before database work.
+ *
+ * @return void
+ */
+function futbolfest_registro_guard_rate_limit() {
+	if ( get_transient( futbolfest_registro_security_key( 'bot_lock' ) ) ) {
+		wp_send_json_error(
+			array( 'message' => 'Demasiados intentos. Intenta nuevamente en unos minutos.' ),
+			429
+		);
+	}
+
+	$limits = array(
+		'minute' => array(
+			'max' => FUTBOLFEST_REGISTRO_RATE_LIMIT_MINUTE,
+			'ttl' => MINUTE_IN_SECONDS,
+		),
+		'hour'   => array(
+			'max' => FUTBOLFEST_REGISTRO_RATE_LIMIT_HOUR,
+			'ttl' => HOUR_IN_SECONDS,
+		),
+	);
+
+	foreach ( $limits as $name => $limit ) {
+		$key   = futbolfest_registro_security_key( 'rate_' . $name );
+		$count = (int) get_transient( $key );
+
+		if ( $count >= $limit['max'] ) {
+			wp_send_json_error(
+				array( 'message' => 'Demasiados registros desde esta red. Intenta nuevamente más tarde.' ),
+				429
+			);
+		}
+
+		set_transient( $key, $count + 1, $limit['ttl'] );
+	}
+}
+
+/**
+ * Temporarily locks obvious bots.
+ *
+ * @return void
+ */
+function futbolfest_registro_lock_client() {
+	set_transient(
+		futbolfest_registro_security_key( 'bot_lock' ),
+		1,
+		FUTBOLFEST_REGISTRO_BOT_LOCK_SECONDS
+	);
+}
+
+/**
+ * Rejects submissions sent unrealistically fast.
+ *
+ * @return void
+ */
+function futbolfest_registro_guard_submit_time() {
+	$rendered_at = isset( $_POST['form_rendered_at'] ) ? absint( $_POST['form_rendered_at'] ) : 0;
+	$now         = time();
+
+	if ( ! $rendered_at || $rendered_at > $now || ( $now - $rendered_at ) < FUTBOLFEST_REGISTRO_MIN_SUBMIT_SECONDS ) {
+		wp_send_json_error(
+			array( 'message' => 'No pudimos validar el formulario. Inténtalo nuevamente.' ),
+			400
+		);
+	}
+}
+
+/**
+ * Normalizes Peruvian mobile numbers to +51XXXXXXXXX.
+ *
+ * @param string $telefono Raw phone number.
+ * @return string Empty when invalid.
+ */
+function futbolfest_registro_normalize_peru_phone( $telefono ) {
+	$digits = preg_replace( '/\D+/', '', $telefono );
+
+	if ( ! is_string( $digits ) || '' === $digits ) {
+		return '';
+	}
+
+	if ( 9 === strlen( $digits ) && '9' === $digits[0] ) {
+		return '+51' . $digits;
+	}
+
+	if ( 11 === strlen( $digits ) && '51' === substr( $digits, 0, 2 ) && '9' === $digits[2] ) {
+		return '+' . $digits;
+	}
+
+	return '';
+}
+
+/**
  * Handles AJAX registration submissions.
  *
  * @return void
  */
 function futbolfest_registro_handle_submission() {
 	check_ajax_referer( 'futbolfest_registro_submit', 'nonce' );
+	futbolfest_registro_guard_rate_limit();
+	futbolfest_registro_guard_submit_time();
 
 	$honeypot = futbolfest_registro_post_text( 'sitio_web' );
 
 	if ( '' !== $honeypot ) {
+		futbolfest_registro_lock_client();
 		wp_send_json_error(
 			array( 'message' => 'No pudimos procesar tu registro.' ),
 			400
@@ -151,6 +272,24 @@ function futbolfest_registro_handle_submission() {
 			400
 		);
 	}
+
+	if ( ! preg_match( '/^[0-9]{8,12}$/', $dni ) ) {
+		wp_send_json_error(
+			array( 'message' => 'Ingresa un DNI válido.' ),
+			400
+		);
+	}
+
+	$telefono_normalizado = futbolfest_registro_normalize_peru_phone( $telefono );
+
+	if ( '' === $telefono_normalizado ) {
+		wp_send_json_error(
+			array( 'message' => 'Ingresa un celular peruano valido.' ),
+			400
+		);
+	}
+
+	$telefono = $telefono_normalizado;
 
 	futbolfest_registro_maybe_create_table();
 

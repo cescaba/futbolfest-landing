@@ -320,3 +320,181 @@ function futbolfest_registro_handle_submission() {
 }
 add_action( 'wp_ajax_futbolfest_registro_submit', 'futbolfest_registro_handle_submission' );
 add_action( 'wp_ajax_nopriv_futbolfest_registro_submit', 'futbolfest_registro_handle_submission' );
+
+/**
+ * Adds the registrations admin page.
+ *
+ * @return void
+ */
+function futbolfest_registro_admin_menu() {
+	add_menu_page(
+		'Registros Futbol Fest',
+		'Registros FF',
+		'manage_options',
+		'futbolfest-registros',
+		'futbolfest_registro_render_admin_page',
+		'dashicons-list-view',
+		30
+	);
+}
+add_action( 'admin_menu', 'futbolfest_registro_admin_menu' );
+
+/**
+ * Renders the registrations admin table.
+ *
+ * @return void
+ */
+function futbolfest_registro_render_admin_page() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'No tienes permisos para ver esta pagina.', 'futbolfest-landing' ) );
+	}
+
+	futbolfest_registro_maybe_create_table();
+
+	global $wpdb;
+
+	$table_name  = futbolfest_registro_table_name();
+	$per_page    = 50;
+	$current     = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+	$offset      = ( $current - 1 ) * $per_page;
+	$total_items = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$total_pages = max( 1, (int) ceil( $total_items / $per_page ) );
+	$rows        = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT id, nombre, apellido, dni, telefono, email, created_at FROM {$table_name} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$per_page,
+			$offset
+		)
+	);
+	$export_url  = wp_nonce_url(
+		admin_url( 'admin-post.php?action=futbolfest_registro_export' ),
+		'futbolfest_registro_export'
+	);
+	?>
+	<div class="wrap">
+		<h1>Registros Futbol Fest</h1>
+
+		<p>
+			<a class="button button-primary" href="<?php echo esc_url( $export_url ); ?>">Descargar CSV</a>
+		</p>
+
+		<p>
+			<strong>Total de registros:</strong> <?php echo esc_html( number_format_i18n( $total_items ) ); ?>
+		</p>
+
+		<table class="widefat striped">
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>Nombre</th>
+					<th>Apellido</th>
+					<th>DNI</th>
+					<th>Telefono</th>
+					<th>Email</th>
+					<th>Fecha</th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php if ( empty( $rows ) ) : ?>
+					<tr>
+						<td colspan="7">Todavia no hay registros.</td>
+					</tr>
+				<?php else : ?>
+					<?php foreach ( $rows as $row ) : ?>
+						<tr>
+							<td><?php echo esc_html( $row->id ); ?></td>
+							<td><?php echo esc_html( $row->nombre ); ?></td>
+							<td><?php echo esc_html( $row->apellido ); ?></td>
+							<td><?php echo esc_html( $row->dni ); ?></td>
+							<td><?php echo esc_html( $row->telefono ); ?></td>
+							<td>
+								<a href="mailto:<?php echo esc_attr( $row->email ); ?>">
+									<?php echo esc_html( $row->email ); ?>
+								</a>
+							</td>
+							<td><?php echo esc_html( mysql2date( 'd/m/Y H:i', $row->created_at ) ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</tbody>
+		</table>
+
+		<?php if ( $total_pages > 1 ) : ?>
+			<div class="tablenav">
+				<div class="tablenav-pages">
+					<?php
+					echo wp_kses_post(
+						paginate_links(
+							array(
+								'base'      => add_query_arg( 'paged', '%#%' ),
+								'format'    => '',
+								'current'   => $current,
+								'total'     => $total_pages,
+								'prev_text' => '&laquo;',
+								'next_text' => '&raquo;',
+							)
+						)
+					);
+					?>
+				</div>
+			</div>
+		<?php endif; ?>
+	</div>
+	<?php
+}
+
+/**
+ * Downloads all registrations as CSV.
+ *
+ * @return void
+ */
+function futbolfest_registro_export_csv() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'No tienes permisos para descargar registros.', 'futbolfest-landing' ) );
+	}
+
+	check_admin_referer( 'futbolfest_registro_export' );
+	futbolfest_registro_maybe_create_table();
+
+	global $wpdb;
+
+	$table_name = futbolfest_registro_table_name();
+	$rows       = $wpdb->get_results(
+		"SELECT id, nombre, apellido, dni, telefono, email, created_at FROM {$table_name} ORDER BY created_at DESC, id DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		ARRAY_A
+	);
+	$filename   = 'futbolfest-registros-' . gmdate( 'Y-m-d-His' ) . '.csv';
+
+	while ( ob_get_level() ) {
+		ob_end_clean();
+	}
+
+	nocache_headers();
+	header( 'Content-Type: text/csv; charset=utf-8' );
+	header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+
+	echo "\xEF\xBB\xBF";
+
+	$output = fopen( 'php://output', 'w' );
+
+	fputcsv( $output, array( 'ID', 'Nombre', 'Apellido', 'DNI', 'Telefono', 'Email', 'Fecha' ) );
+
+	foreach ( $rows as $row ) {
+		fputcsv(
+			$output,
+			array(
+				$row['id'],
+				$row['nombre'],
+				$row['apellido'],
+				$row['dni'],
+				$row['telefono'],
+				$row['email'],
+				$row['created_at'],
+			)
+		);
+	}
+
+	fclose( $output );
+	exit;
+}
+add_action( 'admin_post_futbolfest_registro_export', 'futbolfest_registro_export_csv' );

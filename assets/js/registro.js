@@ -19,6 +19,31 @@
 		var submit = form.querySelector('button[type="submit"]');
 		var formRenderedAt = Math.floor(Date.now() / 1000);
 
+		function initSelectIcon(select) {
+			function openSelect() {
+				select.classList.add('is-open');
+			}
+
+			function closeSelect() {
+				select.classList.remove('is-open');
+			}
+
+			select.addEventListener('pointerdown', openSelect);
+
+			select.addEventListener('keydown', function (event) {
+				if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
+					openSelect();
+				}
+
+				if (event.key === 'Escape' || event.key === 'Tab') {
+					closeSelect();
+				}
+			});
+
+			select.addEventListener('change', closeSelect);
+			select.addEventListener('blur', closeSelect);
+		}
+
 		function setMessage(text, type) {
 			if (!message) {
 				return;
@@ -134,6 +159,8 @@
 				showForm();
 			});
 		}
+
+		form.querySelectorAll('select[name="ninos"], select[name="acompanantes"]').forEach(initSelectIcon);
 	}
 
 	forms.forEach(initRegistroForm);

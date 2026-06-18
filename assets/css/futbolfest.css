@@ -383,7 +383,8 @@ body.futbolfest-modal-open {
 	color: #F5A200;
 }
 
-.registro-field input {
+.registro-field input,
+.registro-field select {
 	width: 100%;
 	height: 44px;
 	padding: 4px 12px;
@@ -399,9 +400,34 @@ body.futbolfest-modal-open {
 	transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.registro-field input:focus {
+.registro-field select {
+	-webkit-appearance: none;
+	appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 4L10 8L6 12' stroke='%23152CA7' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-position: right 12px center;
+	background-size: 16px 16px;
+	background-repeat: no-repeat;
+	border-radius: 11px;
+	overflow: hidden;
+	padding-right: 40px;
+}
+
+.registro-field select.is-open {
+	background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%23152CA7' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.registro-field select option {
+	background: #F5F7FC;
+	border-radius: 11px;
+	color: #5A6A9A;
+	font-family: 'Barlow';
+	font-size: 14px;
+}
+
+.registro-field input:focus,
+.registro-field select:focus {
 	border-color: rgba(26, 63, 160, 0.45);
-	box-shadow: 0 0 0 4px rgba(26, 63, 160, 0.08);
+	box-shadow: none;
 }
 
 .btn.btn-primary.registro-submit {
@@ -1869,7 +1895,8 @@ section {
 		letter-spacing: 0;
 	}
 
-	.registro-field input {
+	.registro-field input,
+	.registro-field select {
 		width: 100%;
 		height: 40px;
 		padding-right: 12px;
@@ -1882,6 +1909,11 @@ section {
 		font-size: 15px;
 		line-height: 100%;
 		letter-spacing: 0;
+	}
+
+	.registro-field select {
+		padding-right: 40px;
+		background-position: right 12px center;
 	}
 
 	.btn.btn-primary.registro-submit {

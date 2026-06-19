@@ -21,7 +21,6 @@ const FUTBOLFEST_REGISTRO_RATE_LIMIT_HOUR = 3000;
 const FUTBOLFEST_REGISTRO_BOT_LOCK_SECONDS = 1800;
 const FUTBOLFEST_REGISTRO_MAX_NINOS = 10;
 const FUTBOLFEST_REGISTRO_PUBLIC_URL = 'https://futbolfestx.com/';
-const FUTBOLFEST_REGISTRO_FROM_EMAIL = 'contacto@futbolfestx.com';
 const FUTBOLFEST_REGISTRO_FROM_NAME = 'Fútbol Fest';
 
 /**
@@ -70,6 +69,7 @@ function futbolfest_registro_table_schema() {
 		PRIMARY KEY  (id),
 		KEY email (email),
 		KEY dni (dni),
+		KEY telefono (telefono),
 		KEY origen (origen),
 		KEY created_at (created_at)
 	) {$charset_collate};";
@@ -149,6 +149,12 @@ function futbolfest_registro_ensure_columns() {
 
 	if ( in_array( 'acompanantes', $columns, true ) ) {
 		$wpdb->query( "ALTER TABLE {$table_name} DROP COLUMN acompanantes" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	$indexes = $wpdb->get_col( "SHOW INDEX FROM {$table_name}", 2 ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+	if ( is_array( $indexes ) && ! in_array( 'telefono', $indexes, true ) ) {
+		$wpdb->query( "ALTER TABLE {$table_name} ADD INDEX telefono (telefono)" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 }
 
@@ -355,6 +361,48 @@ function futbolfest_registro_post_ninos_data() {
 }
 
 /**
+ * Returns the first duplicated registration field found.
+ *
+ * @param string $dni Documento de identidad.
+ * @param string $email Email address.
+ * @param string $telefono Normalized phone number.
+ * @return string
+ */
+function futbolfest_registro_find_duplicate_field( $dni, $email, $telefono ) {
+	global $wpdb;
+
+	$table_name = futbolfest_registro_table_name();
+
+	$duplicate = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT dni, email, telefono FROM {$table_name} WHERE dni = %s OR LOWER(email) = LOWER(%s) OR telefono = %s LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$dni,
+			$email,
+			$telefono
+		),
+		ARRAY_A
+	);
+
+	if ( ! is_array( $duplicate ) ) {
+		return '';
+	}
+
+	if ( isset( $duplicate['dni'] ) && $duplicate['dni'] === $dni ) {
+		return 'dni';
+	}
+
+	if ( isset( $duplicate['email'] ) && strtolower( $duplicate['email'] ) === strtolower( $email ) ) {
+		return 'email';
+	}
+
+	if ( isset( $duplicate['telefono'] ) && $duplicate['telefono'] === $telefono ) {
+		return 'telefono';
+	}
+
+	return 'registro';
+}
+
+/**
  * Sends the registration confirmation email to the attendee.
  *
  * @param string $email Recipient email.
@@ -377,12 +425,9 @@ function futbolfest_registro_send_confirmation_email( $email, $nombre, $apellido
 	$event_url     = FUTBOLFEST_REGISTRO_PUBLIC_URL;
 	$hero_url      = get_theme_file_uri( 'assets/images/SuccessModal.png' );
 	$separator_url = get_theme_file_uri( 'assets/images/separador-hero.png' );
-	$from_email    = sanitize_email( FUTBOLFEST_REGISTRO_FROM_EMAIL );
 	$from_name     = wp_specialchars_decode( FUTBOLFEST_REGISTRO_FROM_NAME, ENT_QUOTES );
 	$headers       = array(
 		'Content-Type: text/html; charset=UTF-8',
-		'From: ' . $from_name . ' <' . $from_email . '>',
-		'Reply-To: ' . $from_name . ' <' . $from_email . '>',
 	);
 
 	$message = sprintf(
@@ -452,7 +497,9 @@ function futbolfest_registro_send_confirmation_email( $email, $nombre, $apellido
 		esc_html( $site_name )
 	);
 
+
 	$sent = wp_mail( $recipient, $subject, $message, $headers );
+
 
 	if ( ! $sent ) {
 		error_log( 'Futbol Fest: no se pudo enviar correo de confirmación a ' . $recipient ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
@@ -537,6 +584,8 @@ function futbolfest_registro_handle_submission() {
 		);
 	}
 
+	$email = strtolower( $email );
+
 	if ( ! preg_match( '/^[0-9]{8,12}$/', $dni ) ) {
 		wp_send_json_error(
 			array( 'message' => 'Ingresa un DNI válido.' ),
@@ -576,6 +625,22 @@ function futbolfest_registro_handle_submission() {
 	futbolfest_registro_maybe_create_table();
 
 	global $wpdb;
+
+	$duplicate_field = futbolfest_registro_find_duplicate_field( $dni, $email, $telefono );
+
+	if ( '' !== $duplicate_field ) {
+		$duplicate_messages = array(
+			'dni'      => 'Este DNI ya se encuentra registrado.',
+			'email'    => 'Este correo electronico ya se encuentra registrado.',
+			'telefono' => 'Este telefono ya se encuentra registrado.',
+			'registro' => 'Ya existe un registro con estos datos.',
+		);
+
+		wp_send_json_error(
+			array( 'message' => isset( $duplicate_messages[ $duplicate_field ] ) ? $duplicate_messages[ $duplicate_field ] : $duplicate_messages['registro'] ),
+			409
+		);
+	}
 
 	$inserted = $wpdb->insert(
 		futbolfest_registro_table_name(),

@@ -14,12 +14,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Schema version for future registration table migrations.
  */
-const FUTBOLFEST_REGISTRO_SCHEMA_VERSION = '1.3.0';
+const FUTBOLFEST_REGISTRO_SCHEMA_VERSION = '1.8.0';
 const FUTBOLFEST_REGISTRO_MIN_SUBMIT_SECONDS = 2;
 const FUTBOLFEST_REGISTRO_RATE_LIMIT_MINUTE = 120;
 const FUTBOLFEST_REGISTRO_RATE_LIMIT_HOUR = 3000;
 const FUTBOLFEST_REGISTRO_BOT_LOCK_SECONDS = 1800;
+const FUTBOLFEST_REGISTRO_MAX_NINOS = 10;
 const FUTBOLFEST_REGISTRO_PUBLIC_URL = 'https://futbolfestx.com/';
+const FUTBOLFEST_REGISTRO_FROM_EMAIL = 'contacto@futbolfestx.com';
+const FUTBOLFEST_REGISTRO_FROM_NAME = 'Fútbol Fest';
 
 /**
  * Returns the full database table name for registrations.
@@ -30,6 +33,17 @@ function futbolfest_registro_table_name() {
 	global $wpdb;
 
 	return $wpdb->prefix . 'futbolfest_registros';
+}
+
+/**
+ * Returns the full database table name for children attached to registrations.
+ *
+ * @return string
+ */
+function futbolfest_registro_ninos_table_name() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'futbolfest_registro_ninos';
 }
 
 /**
@@ -51,7 +65,6 @@ function futbolfest_registro_table_schema() {
 		telefono varchar(30) NOT NULL,
 		email varchar(190) NOT NULL,
 		ninos tinyint(1) unsigned NOT NULL DEFAULT 0,
-		acompanantes tinyint(1) unsigned NOT NULL DEFAULT 0,
 		origen varchar(20) NOT NULL DEFAULT 'home',
 		created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY  (id),
@@ -59,6 +72,29 @@ function futbolfest_registro_table_schema() {
 		KEY dni (dni),
 		KEY origen (origen),
 		KEY created_at (created_at)
+	) {$charset_collate};";
+}
+
+/**
+ * Returns the SQL schema for children attached to registrations.
+ *
+ * @return string
+ */
+function futbolfest_registro_ninos_table_schema() {
+	global $wpdb;
+
+	$table_name      = futbolfest_registro_ninos_table_name();
+	$charset_collate = $wpdb->get_charset_collate();
+
+	return "CREATE TABLE {$table_name} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		registro_id bigint(20) unsigned NOT NULL,
+		nombre varchar(120) NOT NULL,
+		edad tinyint(2) unsigned NOT NULL,
+		created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY  (id),
+		KEY registro_id (registro_id),
+		KEY edad (edad)
 	) {$charset_collate};";
 }
 
@@ -71,6 +107,7 @@ function futbolfest_registro_create_table() {
 	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 	dbDelta( futbolfest_registro_table_schema() );
+	dbDelta( futbolfest_registro_ninos_table_schema() );
 	futbolfest_registro_ensure_columns();
 	update_option( 'futbolfest_registro_schema_version', FUTBOLFEST_REGISTRO_SCHEMA_VERSION );
 }
@@ -83,19 +120,35 @@ function futbolfest_registro_create_table() {
 function futbolfest_registro_ensure_columns() {
 	global $wpdb;
 
-	$table_name = futbolfest_registro_table_name();
-	$columns    = $wpdb->get_col( "DESC {$table_name}", 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$table_name  = futbolfest_registro_table_name();
+	$ninos_table = futbolfest_registro_ninos_table_name();
+	$columns     = $wpdb->get_col( "DESC {$table_name}", 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 	if ( ! is_array( $columns ) ) {
 		return;
+	}
+
+	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $ninos_table ) ) !== $ninos_table ) {
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		dbDelta( futbolfest_registro_ninos_table_schema() );
+	}
+
+	$ninos_columns = $wpdb->get_col( "DESC {$ninos_table}", 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+	if ( is_array( $ninos_columns ) && in_array( 'apellido', $ninos_columns, true ) ) {
+		$wpdb->query( "ALTER TABLE {$ninos_table} DROP COLUMN apellido" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	if ( is_array( $ninos_columns ) && in_array( 'sexo', $ninos_columns, true ) ) {
+		$wpdb->query( "ALTER TABLE {$ninos_table} DROP COLUMN sexo" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 
 	if ( ! in_array( 'ninos', $columns, true ) ) {
 		$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN ninos tinyint(1) unsigned NOT NULL DEFAULT 0 AFTER email" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 
-	if ( ! in_array( 'acompanantes', $columns, true ) ) {
-		$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN acompanantes tinyint(1) unsigned NOT NULL DEFAULT 0 AFTER ninos" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	if ( in_array( 'acompanantes', $columns, true ) ) {
+		$wpdb->query( "ALTER TABLE {$table_name} DROP COLUMN acompanantes" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 }
 
@@ -265,6 +318,43 @@ function futbolfest_registro_normalize_peru_phone( $telefono ) {
 }
 
 /**
+ * Reads and validates children data from POST.
+ *
+ * @return array<int, array{nombre:string, edad:int}>
+ */
+function futbolfest_registro_post_ninos_data() {
+	$nombres = isset( $_POST['nino_nombre'] ) && is_array( $_POST['nino_nombre'] ) ? wp_unslash( $_POST['nino_nombre'] ) : array();
+	$edades  = isset( $_POST['nino_edad'] ) && is_array( $_POST['nino_edad'] ) ? wp_unslash( $_POST['nino_edad'] ) : array();
+	$ninos   = array();
+	$total   = min( count( $nombres ), count( $edades ), FUTBOLFEST_REGISTRO_MAX_NINOS );
+
+	for ( $i = 0; $i < $total; $i++ ) {
+		$nombre_raw = is_scalar( $nombres[ $i ] ) ? (string) $nombres[ $i ] : '';
+		$edad_raw   = is_scalar( $edades[ $i ] ) ? (string) $edades[ $i ] : '';
+		$nombre     = sanitize_text_field( $nombre_raw );
+		$edad       = is_numeric( $edad_raw ) ? absint( $edad_raw ) : null;
+
+		if ( '' === $nombre && null === $edad ) {
+			continue;
+		}
+
+		if ( '' === $nombre || null === $edad || $edad > 17 ) {
+			wp_send_json_error(
+				array( 'message' => 'Completa correctamente los datos de cada niño.' ),
+				400
+			);
+		}
+
+		$ninos[] = array(
+			'nombre' => $nombre,
+			'edad'   => $edad,
+		);
+	}
+
+	return $ninos;
+}
+
+/**
  * Sends the registration confirmation email to the attendee.
  *
  * @param string $email Recipient email.
@@ -287,7 +377,13 @@ function futbolfest_registro_send_confirmation_email( $email, $nombre, $apellido
 	$event_url     = FUTBOLFEST_REGISTRO_PUBLIC_URL;
 	$hero_url      = get_theme_file_uri( 'assets/images/SuccessModal.png' );
 	$separator_url = get_theme_file_uri( 'assets/images/separador-hero.png' );
-	$headers       = array( 'Content-Type: text/html; charset=UTF-8' );
+	$from_email    = sanitize_email( FUTBOLFEST_REGISTRO_FROM_EMAIL );
+	$from_name     = wp_specialchars_decode( FUTBOLFEST_REGISTRO_FROM_NAME, ENT_QUOTES );
+	$headers       = array(
+		'Content-Type: text/html; charset=UTF-8',
+		'From: ' . $from_name . ' <' . $from_email . '>',
+		'Reply-To: ' . $from_name . ' <' . $from_email . '>',
+	);
 
 	$message = sprintf(
 		'<!doctype html>
@@ -319,14 +415,14 @@ function futbolfest_registro_send_confirmation_email( $email, $nombre, $apellido
 						<td style="padding:0 24px 24px;background:#ffffff;">
 							<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#f5f7fc;border-radius:14px;border:1px solid rgba(21,44,167,0.10);">
 								<tr>
-									<td style="padding:12px 16px;">
-										<table role="presentation" width="100%%" cellspacing="0" cellpadding="0">
+									<td align="center" style="padding:12px 16px;">
+										<table role="presentation" cellspacing="0" cellpadding="0" align="center" style="margin:0 auto;">
 											<tr>
 												<td width="30" align="center" valign="middle" style="padding:0;color:#0d1b4b;font-size:18px;line-height:27px;">📍</td>
 												<td align="left" valign="middle" style="padding:0 0 0 12px;">
 													<p style="margin:0 0 2px;color:#5a6a9a;font-size:12px;line-height:12px;font-weight:400;letter-spacing:0;">Nos vemos en</p>
 													<p style="margin:0;color:#0d1b4b;font-size:13px;line-height:20px;font-weight:700;letter-spacing:0;">Jockey Plaza — Puerta 4, Lima</p>
-													<p style="margin:0;color:#152ca7;font-size:12px;line-height:17px;font-weight:600;letter-spacing:0;">15, 16 y 17 de Julio 2026</p>
+													<p style="margin:0;color:#152ca7;font-size:12px;line-height:17px;font-weight:600;letter-spacing:0;">17 de Julio hasta el 31 de Agosto 2026</p>
 												</td>
 											</tr>
 										</table>
@@ -421,12 +517,11 @@ function futbolfest_registro_handle_submission() {
 	$dni          = futbolfest_registro_post_text( 'dni' );
 	$telefono     = futbolfest_registro_post_text( 'telefono' );
 	$email        = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
-	$ninos_raw        = isset( $_POST['ninos'] ) ? sanitize_text_field( wp_unslash( $_POST['ninos'] ) ) : '';
-	$acompanantes_raw = isset( $_POST['acompanantes'] ) ? sanitize_text_field( wp_unslash( $_POST['acompanantes'] ) ) : '';
-	$ninos            = '' !== $ninos_raw ? absint( $ninos_raw ) : null;
-	$acompanantes     = '' !== $acompanantes_raw ? absint( $acompanantes_raw ) : null;
-	$origen           = futbolfest_registro_post_text( 'origen' );
-	$origen           = in_array( $origen, array( 'home', 'qr' ), true ) ? $origen : 'home';
+	$ninos_raw    = isset( $_POST['ninos'] ) ? sanitize_text_field( wp_unslash( $_POST['ninos'] ) ) : '';
+	$ninos        = '' !== $ninos_raw ? absint( $ninos_raw ) : null;
+	$ninos_data   = array();
+	$origen       = futbolfest_registro_post_text( 'origen' );
+	$origen       = in_array( $origen, array( 'home', 'qr' ), true ) ? $origen : 'home';
 
 	if ( '' === $nombre || '' === $apellido || '' === $dni || '' === $telefono || '' === $email ) {
 		wp_send_json_error(
@@ -456,11 +551,15 @@ function futbolfest_registro_handle_submission() {
 		);
 	}
 
-	if ( null === $acompanantes || $acompanantes > 4 ) {
-		wp_send_json_error(
-			array( 'message' => 'Selecciona una opción válida para acompañantes.' ),
-			400
-		);
+	if ( 1 === $ninos ) {
+		$ninos_data = futbolfest_registro_post_ninos_data();
+
+		if ( empty( $ninos_data ) ) {
+			wp_send_json_error(
+				array( 'message' => 'Agrega al menos un niño.' ),
+				400
+			);
+		}
 	}
 
 	$telefono_normalizado = futbolfest_registro_normalize_peru_phone( $telefono );
@@ -487,10 +586,9 @@ function futbolfest_registro_handle_submission() {
 			'telefono'     => $telefono,
 			'email'        => $email,
 			'ninos'        => $ninos,
-			'acompanantes' => $acompanantes,
 			'origen'       => $origen,
 		),
-		array( '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s' )
+		array( '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
 	);
 
 	if ( false === $inserted ) {
@@ -498,6 +596,30 @@ function futbolfest_registro_handle_submission() {
 			array( 'message' => 'No pudimos guardar tu registro. Inténtalo nuevamente.' ),
 			500
 		);
+	}
+
+	$registro_id = (int) $wpdb->insert_id;
+
+	foreach ( $ninos_data as $nino ) {
+		$child_inserted = $wpdb->insert(
+			futbolfest_registro_ninos_table_name(),
+			array(
+				'registro_id' => $registro_id,
+				'nombre'      => $nino['nombre'],
+				'edad'        => $nino['edad'],
+			),
+			array( '%d', '%s', '%d' )
+		);
+
+		if ( false === $child_inserted ) {
+			$wpdb->delete( futbolfest_registro_ninos_table_name(), array( 'registro_id' => $registro_id ), array( '%d' ) );
+			$wpdb->delete( futbolfest_registro_table_name(), array( 'id' => $registro_id ), array( '%d' ) );
+
+			wp_send_json_error(
+				array( 'message' => 'No pudimos guardar los datos de los niños. Inténtalo nuevamente.' ),
+				500
+			);
+		}
 	}
 
 	futbolfest_registro_queue_confirmation_email( $email, $nombre, $apellido );
@@ -559,27 +681,60 @@ function futbolfest_registro_ninos_label( $ninos ) {
 }
 
 /**
- * Returns a readable label for the amount of companions coming with a registration.
+ * Returns children grouped by registration ID.
  *
- * @param int $acompanantes Number of companions.
+ * @param array<int> $registro_ids Registration IDs.
+ * @return array<int, array<int, array{nombre:string, edad:int}>>
+ */
+function futbolfest_registro_get_ninos_map( $registro_ids ) {
+	global $wpdb;
+
+	$registro_ids = array_values( array_unique( array_filter( array_map( 'absint', $registro_ids ) ) ) );
+
+	if ( empty( $registro_ids ) ) {
+		return array();
+	}
+
+	$table_name   = futbolfest_registro_ninos_table_name();
+	$placeholders = implode( ',', array_fill( 0, count( $registro_ids ), '%d' ) );
+	$query        = "SELECT registro_id, nombre, edad FROM {$table_name} WHERE registro_id IN ({$placeholders}) ORDER BY id ASC"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$rows         = $wpdb->get_results( $wpdb->prepare( $query, $registro_ids ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	$map          = array();
+
+	foreach ( $rows as $row ) {
+		$registro_id = absint( $row['registro_id'] );
+
+		if ( ! isset( $map[ $registro_id ] ) ) {
+			$map[ $registro_id ] = array();
+		}
+
+		$map[ $registro_id ][] = array(
+			'nombre' => $row['nombre'],
+			'edad'   => absint( $row['edad'] ),
+		);
+	}
+
+	return $map;
+}
+
+/**
+ * Formats children data for admin tables and exports.
+ *
+ * @param array<int, array{nombre:string, edad:int}> $ninos_data Children data.
  * @return string
  */
-function futbolfest_registro_acompanantes_label( $acompanantes ) {
-	$acompanantes = absint( $acompanantes );
-
-	if ( 0 === $acompanantes ) {
-		return 'Sin acompañantes';
+function futbolfest_registro_format_ninos_data( $ninos_data ) {
+	if ( empty( $ninos_data ) ) {
+		return 'No';
 	}
 
-	if ( 1 === $acompanantes ) {
-		return '1 acompañante';
+	$items = array();
+
+	foreach ( $ninos_data as $nino ) {
+		$items[] = sprintf( '%s (%d años)', $nino['nombre'], absint( $nino['edad'] ) );
 	}
 
-	if ( $acompanantes >= 4 ) {
-		return '4 o más acompañantes';
-	}
-
-	return $acompanantes . ' acompañantes';
+	return implode( ', ', $items );
 }
 
 /**
@@ -607,7 +762,7 @@ function futbolfest_registro_render_admin_page() {
 	$count_total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	$total_items = $origen ? ( 'qr' === $origen ? $count_qr : $count_home ) : $count_total;
 	$total_pages = max( 1, (int) ceil( $total_items / $per_page ) );
-	$query       = "SELECT id, nombre, apellido, dni, telefono, email, ninos, acompanantes, origen, created_at FROM {$table_name}"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$query       = "SELECT id, nombre, apellido, dni, telefono, email, ninos, origen, created_at FROM {$table_name}"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	$args        = array();
 
 	if ( $origen ) {
@@ -620,6 +775,7 @@ function futbolfest_registro_render_admin_page() {
 	$args[] = $offset;
 
 	$rows       = $wpdb->get_results( $wpdb->prepare( $query, $args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	$ninos_map  = futbolfest_registro_get_ninos_map( wp_list_pluck( $rows, 'id' ) );
 	$export_url = wp_nonce_url(
 		add_query_arg(
 			array_filter(
@@ -667,7 +823,7 @@ function futbolfest_registro_render_admin_page() {
 					<th>Telefono</th>
 					<th>Email</th>
 					<th>Niños</th>
-					<th>Acompañantes</th>
+					<th>Detalle niños</th>
 					<th>Origen</th>
 					<th>Fecha</th>
 				</tr>
@@ -691,7 +847,7 @@ function futbolfest_registro_render_admin_page() {
 								</a>
 							</td>
 							<td><?php echo esc_html( futbolfest_registro_ninos_label( $row->ninos ) ); ?></td>
-							<td><?php echo esc_html( futbolfest_registro_acompanantes_label( $row->acompanantes ) ); ?></td>
+							<td><?php echo esc_html( futbolfest_registro_format_ninos_data( isset( $ninos_map[ $row->id ] ) ? $ninos_map[ $row->id ] : array() ) ); ?></td>
 							<td><?php echo esc_html( futbolfest_registro_origen_label( $row->origen ) ); ?></td>
 							<td><?php echo esc_html( mysql2date( 'd/m/Y H:i', $row->created_at ) ); ?></td>
 						</tr>
@@ -742,7 +898,7 @@ function futbolfest_registro_export_csv() {
 	$table_name = futbolfest_registro_table_name();
 	$origen     = isset( $_GET['origen'] ) ? sanitize_key( wp_unslash( $_GET['origen'] ) ) : '';
 	$origen     = in_array( $origen, array( 'home', 'qr' ), true ) ? $origen : '';
-	$query      = "SELECT id, nombre, apellido, dni, telefono, email, ninos, acompanantes, origen, created_at FROM {$table_name}"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$query      = "SELECT id, nombre, apellido, dni, telefono, email, ninos, origen, created_at FROM {$table_name}"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	$args       = array();
 
 	if ( $origen ) {
@@ -754,6 +910,7 @@ function futbolfest_registro_export_csv() {
 	$rows   = $origen
 		? $wpdb->get_results( $wpdb->prepare( $query, $args ), ARRAY_A ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		: $wpdb->get_results( $query, ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	$ninos_map = futbolfest_registro_get_ninos_map( wp_list_pluck( $rows, 'id' ) );
 
 	$filename = 'futbolfest-registros' . ( $origen ? '-' . $origen : '' ) . '-' . gmdate( 'Y-m-d-His' ) . '.csv';
 
@@ -769,7 +926,7 @@ function futbolfest_registro_export_csv() {
 
 	$output = fopen( 'php://output', 'w' );
 
-	fputcsv( $output, array( 'ID', 'Nombre', 'Apellido', 'DNI', 'Telefono', 'Email', 'Niños', 'Acompañantes', 'Origen', 'Fecha' ) );
+	fputcsv( $output, array( 'ID', 'Nombre', 'Apellido', 'DNI', 'Telefono', 'Email', 'Niños', 'Detalle niños', 'Origen', 'Fecha' ) );
 
 	foreach ( $rows as $row ) {
 		fputcsv(
@@ -782,7 +939,7 @@ function futbolfest_registro_export_csv() {
 				$row['telefono'],
 				$row['email'],
 				futbolfest_registro_ninos_label( $row['ninos'] ),
-				futbolfest_registro_acompanantes_label( $row['acompanantes'] ),
+				futbolfest_registro_format_ninos_data( isset( $ninos_map[ $row['id'] ] ) ? $ninos_map[ $row['id'] ] : array() ),
 				futbolfest_registro_origen_label( $row['origen'] ),
 				$row['created_at'],
 			)

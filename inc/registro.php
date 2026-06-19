@@ -11,17 +11,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/* ============================================
+   CONFIGURATION
+   ============================================ */
+
 /**
  * Schema version for future registration table migrations.
  */
-const FUTBOLFEST_REGISTRO_SCHEMA_VERSION = '1.8.0';
+const FUTBOLFEST_REGISTRO_SCHEMA_VERSION = '1.10.0';
 const FUTBOLFEST_REGISTRO_MIN_SUBMIT_SECONDS = 2;
 const FUTBOLFEST_REGISTRO_RATE_LIMIT_MINUTE = 120;
 const FUTBOLFEST_REGISTRO_RATE_LIMIT_HOUR = 3000;
 const FUTBOLFEST_REGISTRO_BOT_LOCK_SECONDS = 1800;
 const FUTBOLFEST_REGISTRO_MAX_NINOS = 10;
+const FUTBOLFEST_REGISTRO_EMAIL_BATCH_SIZE = 40;
+const FUTBOLFEST_REGISTRO_EMAIL_MAX_ATTEMPTS = 4;
 const FUTBOLFEST_REGISTRO_PUBLIC_URL = 'https://futbolfestx.com/';
 const FUTBOLFEST_REGISTRO_FROM_NAME = 'Fútbol Fest';
+
+/* ============================================
+   DATABASE TABLE NAMES
+   ============================================ */
 
 /**
  * Returns the full database table name for registrations.
@@ -46,6 +56,21 @@ function futbolfest_registro_ninos_table_name() {
 }
 
 /**
+ * Returns the full database table name for queued confirmation emails.
+ *
+ * @return string
+ */
+function futbolfest_registro_email_queue_table_name() {
+	global $wpdb;
+
+	return $wpdb->prefix . 'futbolfest_registro_email_queue';
+}
+
+/* ============================================
+   DATABASE SCHEMAS
+   ============================================ */
+
+/**
  * Returns the SQL schema for the registrations table.
  *
  * @return string
@@ -67,9 +92,9 @@ function futbolfest_registro_table_schema() {
 		origen varchar(20) NOT NULL DEFAULT 'home',
 		created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY  (id),
-		KEY email (email),
-		KEY dni (dni),
-		KEY telefono (telefono),
+		UNIQUE KEY unique_email (email),
+		UNIQUE KEY unique_dni (dni),
+		UNIQUE KEY unique_telefono (telefono),
 		KEY origen (origen),
 		KEY created_at (created_at)
 	) {$charset_collate};";
@@ -99,6 +124,89 @@ function futbolfest_registro_ninos_table_schema() {
 }
 
 /**
+ * Returns the SQL schema for queued confirmation emails.
+ *
+ * @return string
+ */
+function futbolfest_registro_email_queue_table_schema() {
+	global $wpdb;
+
+	$table_name      = futbolfest_registro_email_queue_table_name();
+	$charset_collate = $wpdb->get_charset_collate();
+
+	return "CREATE TABLE {$table_name} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		registro_id bigint(20) unsigned NOT NULL,
+		email varchar(190) NOT NULL,
+		nombre varchar(120) NOT NULL,
+		apellido varchar(120) NOT NULL,
+		status varchar(20) NOT NULL DEFAULT 'pending',
+		attempts tinyint(2) unsigned NOT NULL DEFAULT 0,
+		last_error text NULL,
+		available_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		sent_at datetime NULL DEFAULT NULL,
+		PRIMARY KEY  (id),
+		UNIQUE KEY registro_id (registro_id),
+		KEY status_available (status, available_at),
+		KEY email (email),
+		KEY created_at (created_at)
+	) {$charset_collate};";
+}
+
+/* ============================================
+   DATABASE MIGRATIONS
+   ============================================ */
+
+/**
+ * Checks whether a table column contains duplicate values.
+ *
+ * @param string $table_name Database table name.
+ * @param string $column Column name.
+ * @return bool
+ */
+function futbolfest_registro_column_has_duplicates( $table_name, $column ) {
+	global $wpdb;
+
+	$allowed_columns = array( 'dni', 'email', 'telefono' );
+
+	if ( ! in_array( $column, $allowed_columns, true ) ) {
+		return true;
+	}
+
+	$duplicate = $wpdb->get_var(
+		"SELECT {$column} FROM {$table_name} GROUP BY {$column} HAVING COUNT(*) > 1 LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	);
+
+	return null !== $duplicate;
+}
+
+/**
+ * Ensures a unique index exists when current data allows it.
+ *
+ * @param string $table_name Database table name.
+ * @param string $column Column name.
+ * @param array<string> $indexes Existing index names.
+ * @return void
+ */
+function futbolfest_registro_ensure_unique_index( $table_name, $column, $indexes ) {
+	global $wpdb;
+
+	$index_name = 'unique_' . $column;
+
+	if ( in_array( $index_name, $indexes, true ) ) {
+		return;
+	}
+
+	if ( futbolfest_registro_column_has_duplicates( $table_name, $column ) ) {
+		error_log( 'Futbol Fest: no se pudo agregar indice unico para ' . $column . ' porque existen duplicados.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		return;
+	}
+
+	$wpdb->query( "ALTER TABLE {$table_name} ADD UNIQUE KEY {$index_name} ({$column})" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+}
+
+/**
  * Creates or updates the registrations table.
  *
  * @return void
@@ -108,6 +216,7 @@ function futbolfest_registro_create_table() {
 
 	dbDelta( futbolfest_registro_table_schema() );
 	dbDelta( futbolfest_registro_ninos_table_schema() );
+	dbDelta( futbolfest_registro_email_queue_table_schema() );
 	futbolfest_registro_ensure_columns();
 	update_option( 'futbolfest_registro_schema_version', FUTBOLFEST_REGISTRO_SCHEMA_VERSION );
 }
@@ -122,6 +231,7 @@ function futbolfest_registro_ensure_columns() {
 
 	$table_name  = futbolfest_registro_table_name();
 	$ninos_table = futbolfest_registro_ninos_table_name();
+	$email_queue = futbolfest_registro_email_queue_table_name();
 	$columns     = $wpdb->get_col( "DESC {$table_name}", 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 	if ( ! is_array( $columns ) ) {
@@ -131,6 +241,11 @@ function futbolfest_registro_ensure_columns() {
 	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $ninos_table ) ) !== $ninos_table ) {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( futbolfest_registro_ninos_table_schema() );
+	}
+
+	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $email_queue ) ) !== $email_queue ) {
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		dbDelta( futbolfest_registro_email_queue_table_schema() );
 	}
 
 	$ninos_columns = $wpdb->get_col( "DESC {$ninos_table}", 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -156,6 +271,12 @@ function futbolfest_registro_ensure_columns() {
 	if ( is_array( $indexes ) && ! in_array( 'telefono', $indexes, true ) ) {
 		$wpdb->query( "ALTER TABLE {$table_name} ADD INDEX telefono (telefono)" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
+
+	if ( is_array( $indexes ) ) {
+		futbolfest_registro_ensure_unique_index( $table_name, 'dni', $indexes );
+		futbolfest_registro_ensure_unique_index( $table_name, 'email', $indexes );
+		futbolfest_registro_ensure_unique_index( $table_name, 'telefono', $indexes );
+	}
 }
 
 /**
@@ -173,6 +294,10 @@ function futbolfest_registro_maybe_create_table() {
 }
 add_action( 'after_switch_theme', 'futbolfest_registro_create_table' );
 add_action( 'admin_init', 'futbolfest_registro_maybe_create_table' );
+
+/* ============================================
+   FRONTEND ASSETS
+   ============================================ */
 
 /**
  * Enqueues the registration AJAX script.
@@ -198,6 +323,10 @@ function futbolfest_registro_enqueue_scripts() {
 	);
 }
 add_action( 'wp_enqueue_scripts', 'futbolfest_registro_enqueue_scripts' );
+
+/* ============================================
+   REQUEST HELPERS AND SECURITY
+   ============================================ */
 
 /**
  * Reads and sanitizes a text field from POST.
@@ -298,6 +427,10 @@ function futbolfest_registro_guard_submit_time() {
 		);
 	}
 }
+
+/* ============================================
+   SERVER-SIDE VALIDATION HELPERS
+   ============================================ */
 
 /**
  * Normalizes Peruvian mobile numbers to +51XXXXXXXXX.
@@ -401,6 +534,10 @@ function futbolfest_registro_find_duplicate_field( $dni, $email, $telefono ) {
 
 	return 'registro';
 }
+
+/* ============================================
+   CONFIRMATION EMAIL TEMPLATE
+   ============================================ */
 
 /**
  * Sends the registration confirmation email to the attendee.
@@ -508,36 +645,219 @@ function futbolfest_registro_send_confirmation_email( $email, $nombre, $apellido
 	return $sent;
 }
 
+/* ============================================
+   EMAIL QUEUE
+   ============================================ */
+
 /**
- * Queues the confirmation email so the AJAX registration response is not delayed.
+ * Returns the internal token used by the non-blocking email queue trigger.
  *
+ * @return string
+ */
+function futbolfest_registro_email_queue_token() {
+	return hash_hmac( 'sha256', 'futbolfest_registro_email_queue', wp_salt( 'auth' ) );
+}
+
+/**
+ * Schedules a fallback queue processor in case the async request is delayed.
+ *
+ * @return void
+ */
+function futbolfest_registro_schedule_email_queue_fallback() {
+	if ( ! wp_next_scheduled( 'futbolfest_registro_process_email_queue' ) ) {
+		wp_schedule_single_event( time() + 60, 'futbolfest_registro_process_email_queue' );
+	}
+}
+
+/**
+ * Triggers queue processing without making the registration request wait.
+ *
+ * @return void
+ */
+function futbolfest_registro_dispatch_email_queue() {
+	futbolfest_registro_schedule_email_queue_fallback();
+
+	wp_remote_post(
+		admin_url( 'admin-ajax.php' ),
+		array(
+			'timeout'   => 0.01,
+			'blocking'  => false,
+			'sslverify' => apply_filters( 'https_local_ssl_verify', false ),
+			'body'      => array(
+				'action' => 'futbolfest_registro_process_email_queue',
+				'token'  => futbolfest_registro_email_queue_token(),
+			),
+		)
+	);
+}
+
+/**
+ * Queues the confirmation email so the AJAX registration response stays fast.
+ *
+ * @param int    $registro_id Registration ID.
  * @param string $email Recipient email.
  * @param string $nombre Recipient first name.
  * @param string $apellido Recipient last name.
  * @return void
  */
-function futbolfest_registro_queue_confirmation_email( $email, $nombre, $apellido ) {
-	$args = array(
-		sanitize_email( $email ),
-		sanitize_text_field( $nombre ),
-		sanitize_text_field( $apellido ),
-	);
+function futbolfest_registro_queue_confirmation_email( $registro_id, $email, $nombre, $apellido ) {
+	global $wpdb;
 
-	if ( ! is_email( $args[0] ) ) {
+	$recipient = sanitize_email( $email );
+
+	if ( ! $registro_id || ! is_email( $recipient ) ) {
 		return;
 	}
 
-	$scheduled = wp_schedule_single_event(
-		time() + 1,
-		'futbolfest_registro_send_confirmation_email',
-		$args
+	$wpdb->replace(
+		futbolfest_registro_email_queue_table_name(),
+		array(
+			'registro_id'   => absint( $registro_id ),
+			'email'         => $recipient,
+			'nombre'        => sanitize_text_field( $nombre ),
+			'apellido'      => sanitize_text_field( $apellido ),
+			'status'        => 'pending',
+			'attempts'      => 0,
+			'last_error'    => null,
+			'available_at'  => current_time( 'mysql' ),
+			'created_at'    => current_time( 'mysql' ),
+			'sent_at'       => null,
+		),
+		array( '%d', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' )
 	);
 
-	if ( ! $scheduled ) {
-		futbolfest_registro_send_confirmation_email( $args[0], $args[1], $args[2] );
-	}
+	futbolfest_registro_dispatch_email_queue();
 }
-add_action( 'futbolfest_registro_send_confirmation_email', 'futbolfest_registro_send_confirmation_email', 10, 3 );
+
+/**
+ * Processes queued confirmation emails in controlled batches.
+ *
+ * @param int $limit Batch size.
+ * @return int Number of processed rows.
+ */
+function futbolfest_registro_process_email_queue_batch( $limit = FUTBOLFEST_REGISTRO_EMAIL_BATCH_SIZE ) {
+	global $wpdb;
+
+	$table_name = futbolfest_registro_email_queue_table_name();
+	$now        = current_time( 'mysql' );
+	$limit      = max( 1, min( 100, absint( $limit ) ) );
+	$rows       = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT * FROM {$table_name} WHERE ((status IN ('pending', 'failed') AND attempts < %d) OR (status = 'processing' AND attempts < %d AND available_at <= %s)) AND available_at <= %s ORDER BY created_at ASC LIMIT %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			FUTBOLFEST_REGISTRO_EMAIL_MAX_ATTEMPTS,
+			FUTBOLFEST_REGISTRO_EMAIL_MAX_ATTEMPTS,
+			$now,
+			$now,
+			$limit
+		),
+		ARRAY_A
+	);
+
+	if ( empty( $rows ) ) {
+		return 0;
+	}
+
+	foreach ( $rows as $row ) {
+		$queue_id = absint( $row['id'] );
+		$attempts = absint( $row['attempts'] ) + 1;
+
+		$locked = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$table_name} SET status = 'processing', attempts = %d, available_at = %s WHERE id = %d AND status IN ('pending', 'failed', 'processing') AND available_at <= %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$attempts,
+				date_i18n( 'Y-m-d H:i:s', time() + 600 ),
+				$queue_id,
+				$now
+			)
+		);
+
+		if ( ! $locked ) {
+			continue;
+		}
+
+		$sent = futbolfest_registro_send_confirmation_email( $row['email'], $row['nombre'], $row['apellido'] );
+
+		if ( $sent ) {
+			$wpdb->update(
+				$table_name,
+				array(
+					'status'     => 'sent',
+					'last_error' => null,
+					'sent_at'    => current_time( 'mysql' ),
+				),
+				array( 'id' => $queue_id ),
+				array( '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+
+			continue;
+		}
+
+		$retry_delay = min( 3600, 60 * $attempts * $attempts );
+		$next_status = $attempts >= FUTBOLFEST_REGISTRO_EMAIL_MAX_ATTEMPTS ? 'failed' : 'pending';
+
+		$wpdb->update(
+			$table_name,
+			array(
+				'status'       => $next_status,
+				'last_error'   => 'wp_mail returned false',
+				'available_at' => date_i18n( 'Y-m-d H:i:s', time() + $retry_delay ),
+			),
+			array( 'id' => $queue_id ),
+			array( '%s', '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	if ( futbolfest_registro_email_queue_has_pending() ) {
+		futbolfest_registro_schedule_email_queue_fallback();
+	}
+
+	return count( $rows );
+}
+
+/**
+ * Checks if pending email queue rows remain.
+ *
+ * @return bool
+ */
+function futbolfest_registro_email_queue_has_pending() {
+	global $wpdb;
+
+	$table_name = futbolfest_registro_email_queue_table_name();
+	$pending    = $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT COUNT(*) FROM {$table_name} WHERE status IN ('pending', 'failed') AND attempts < %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			FUTBOLFEST_REGISTRO_EMAIL_MAX_ATTEMPTS
+		)
+	);
+
+	return (int) $pending > 0;
+}
+
+/**
+ * Handles async queue processing requests.
+ *
+ * @return void
+ */
+function futbolfest_registro_process_email_queue_ajax() {
+	$token = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( $_POST['token'] ) ) : '';
+
+	if ( ! hash_equals( futbolfest_registro_email_queue_token(), $token ) ) {
+		wp_send_json_error( array( 'message' => 'Invalid queue token.' ), 403 );
+	}
+
+	$processed = futbolfest_registro_process_email_queue_batch();
+
+	wp_send_json_success( array( 'processed' => $processed ) );
+}
+add_action( 'wp_ajax_futbolfest_registro_process_email_queue', 'futbolfest_registro_process_email_queue_ajax' );
+add_action( 'wp_ajax_nopriv_futbolfest_registro_process_email_queue', 'futbolfest_registro_process_email_queue_ajax' );
+add_action( 'futbolfest_registro_process_email_queue', 'futbolfest_registro_process_email_queue_batch' );
+
+/* ============================================
+   FORM SUBMISSION
+   ============================================ */
 
 /**
  * Handles AJAX registration submissions.
@@ -657,6 +977,13 @@ function futbolfest_registro_handle_submission() {
 	);
 
 	if ( false === $inserted ) {
+		if ( isset( $wpdb->last_error ) && false !== stripos( $wpdb->last_error, 'Duplicate' ) ) {
+			wp_send_json_error(
+				array( 'message' => 'Ya existe un registro con este DNI, correo o telefono.' ),
+				409
+			);
+		}
+
 		wp_send_json_error(
 			array( 'message' => 'No pudimos guardar tu registro. Inténtalo nuevamente.' ),
 			500
@@ -687,7 +1014,7 @@ function futbolfest_registro_handle_submission() {
 		}
 	}
 
-	futbolfest_registro_queue_confirmation_email( $email, $nombre, $apellido );
+	futbolfest_registro_queue_confirmation_email( $registro_id, $email, $nombre, $apellido );
 
 	wp_send_json_success(
 		array( 'message' => 'Registro guardado correctamente.' )
@@ -695,6 +1022,10 @@ function futbolfest_registro_handle_submission() {
 }
 add_action( 'wp_ajax_futbolfest_registro_submit', 'futbolfest_registro_handle_submission' );
 add_action( 'wp_ajax_nopriv_futbolfest_registro_submit', 'futbolfest_registro_handle_submission' );
+
+/* ============================================
+   ADMIN REGISTRATIONS PAGE
+   ============================================ */
 
 /**
  * Adds the registrations admin page.
@@ -944,6 +1275,10 @@ function futbolfest_registro_render_admin_page() {
 	</div>
 	<?php
 }
+
+/* ============================================
+   CSV EXPORT
+   ============================================ */
 
 /**
  * Downloads all registrations as CSV.

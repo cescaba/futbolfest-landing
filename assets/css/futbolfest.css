@@ -289,7 +289,7 @@ body.futbolfest-modal-open {
 
 .registro-card {
 	width: 100%;
-	min-height: 510px;
+	min-height: 785px;
 	background: #ffffff;
 	border: 1px solid rgba(26, 63, 160, 0.08);
 	border-radius: 16px;
@@ -2382,6 +2382,7 @@ section {
 
 	.registro-confirmacion-hero {
 		min-height: 150px;
+		background-image: url('/wp-content/themes/futbolfest-landing/assets/images/confirmacion.jpeg');
 		background-size: cover;
 		background-position: center;
 	}

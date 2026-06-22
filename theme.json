@@ -158,6 +158,11 @@
 			"name": "contacto",
 			"title": "Contacto",
 			"area": "uncategorized"
+		},
+		{
+			"name": "reclamacion",
+			"title": "Reclamación",
+			"area": "uncategorized"
 		}
 	]
 }

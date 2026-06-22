@@ -2,9 +2,10 @@
 	'use strict';
 
 	var config = window.FutbolFestRegistro || {};
-	var forms = document.querySelectorAll('[data-futbolfest-registro-form]');
+	var registroForms = document.querySelectorAll('[data-futbolfest-registro-form]');
+	var reclamacionForms = document.querySelectorAll('[data-futbolfest-reclamacion-form]');
 
-	if (!forms.length || !config.ajaxUrl || !config.nonce) {
+	if (!config.ajaxUrl) {
 		return;
 	}
 
@@ -260,5 +261,81 @@
 		resetKidsPanel();
 	}
 
-	forms.forEach(initRegistroForm);
+	function initReclamacionForm(form) {
+		var message = form.querySelector('[data-futbolfest-reclamacion-message]');
+		var submit = form.querySelector('button[type="submit"]');
+
+		function setMessage(text, type) {
+			if (!message) {
+				return;
+			}
+
+			message.textContent = text || '';
+			message.dataset.state = type || '';
+		}
+
+		function setLoading(isLoading) {
+			if (!submit) {
+				return;
+			}
+
+			submit.disabled = isLoading;
+			submit.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+		}
+
+		form.addEventListener('submit', function (event) {
+			event.preventDefault();
+
+			if (!config.reclamacionNonce) {
+				setMessage('No pudimos preparar el envío. Recarga la página e inténtalo nuevamente.', 'error');
+				return;
+			}
+
+			if (!form.checkValidity()) {
+				form.reportValidity();
+				return;
+			}
+
+			var payload = new FormData(form);
+			payload.append('action', 'futbolfest_reclamacion_submit');
+			payload.append('nonce', config.reclamacionNonce);
+
+			setLoading(true);
+			setMessage('Enviando reclamación...', 'loading');
+
+			fetch(config.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: payload
+			})
+				.then(function (response) {
+					return response.json();
+				})
+				.then(function (result) {
+					var text = result && result.data && result.data.message
+						? result.data.message
+						: 'No pudimos enviar tu reclamación.';
+
+					if (!result || !result.success) {
+						setMessage(text, 'error');
+						return;
+					}
+
+					form.reset();
+					setMessage(text, 'success');
+				})
+				.catch(function () {
+					setMessage('No pudimos conectar con el servidor. Inténtalo nuevamente.', 'error');
+				})
+				.finally(function () {
+					setLoading(false);
+				});
+		});
+	}
+
+	if (config.nonce) {
+		registroForms.forEach(initRegistroForm);
+	}
+
+	reclamacionForms.forEach(initReclamacionForm);
 }());

@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const FUTBOLFEST_ROUTES_VERSION = '1.0.1';
+const FUTBOLFEST_ROUTES_VERSION = '1.0.3';
 
 /**
  * Registers clean front-end routes owned by the theme.
@@ -20,6 +20,12 @@ function futbolfest_register_routes() {
 	add_rewrite_rule(
 		'^formulario-registro/?$',
 		'index.php?futbolfest_route=registro_qr',
+		'top'
+	);
+
+	add_rewrite_rule(
+		'^reclamacion/?$',
+		'index.php?futbolfest_route=reclamacion',
 		'top'
 	);
 }
@@ -56,16 +62,19 @@ add_action( 'init', 'futbolfest_maybe_flush_routes', 20 );
 add_action( 'after_switch_theme', 'futbolfest_maybe_flush_routes' );
 
 /**
- * Renders the standalone QR registration page.
+ * Renders standalone theme routes.
  *
  * @return void
  */
-function futbolfest_render_registro_qr_route() {
-	if ( 'registro_qr' !== get_query_var( 'futbolfest_route' ) ) {
+function futbolfest_render_theme_route() {
+	$route = get_query_var( 'futbolfest_route' );
+
+	if ( ! in_array( $route, array( 'registro_qr', 'reclamacion' ), true ) ) {
 		return;
 	}
 
-	$template_path = get_theme_file_path( 'templates/registro-qr.html' );
+	$template_file = 'reclamacion' === $route ? 'templates/reclamacion.html' : 'templates/registro-qr.html';
+	$template_path = get_theme_file_path( $template_file );
 
 	if ( ! file_exists( $template_path ) ) {
 		status_header( 404 );
@@ -82,7 +91,7 @@ function futbolfest_render_registro_qr_route() {
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<?php wp_head(); ?>
 	</head>
-	<body <?php body_class( 'futbolfest-registro-qr-route' ); ?>>
+	<body <?php body_class( 'reclamacion' === $route ? 'futbolfest-reclamacion-route' : 'futbolfest-registro-qr-route' ); ?>>
 		<?php wp_body_open(); ?>
 		<?php echo do_blocks( file_get_contents( $template_path ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 		<?php wp_footer(); ?>
@@ -91,4 +100,19 @@ function futbolfest_render_registro_qr_route() {
 	<?php
 	exit;
 }
-add_action( 'template_redirect', 'futbolfest_render_registro_qr_route' );
+add_action( 'template_redirect', 'futbolfest_render_theme_route' );
+
+/**
+ * Sets a clean document title for standalone theme routes.
+ *
+ * @param string $title Current document title.
+ * @return string
+ */
+function futbolfest_route_document_title( $title ) {
+	if ( 'reclamacion' === get_query_var( 'futbolfest_route' ) ) {
+		return 'Libro de reclamaciones - Futbol Fest X';
+	}
+
+	return $title;
+}
+add_filter( 'pre_get_document_title', 'futbolfest_route_document_title' );

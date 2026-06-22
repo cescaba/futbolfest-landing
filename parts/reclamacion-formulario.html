@@ -1,0 +1,96 @@
+<!-- RECLAMACION SECTION -->
+<section id="reclamacion" class="general-section reclamacion-section">
+	<div class="reclamacion-container">
+		<div class="reclamacion-intro">
+			<p class="reclamacion-eyebrow">Futbol Fest X</p>
+			<h1 class="reclamacion-heading" id="reclamacion-title">Libro de reclamaciones</h1>
+			<p class="reclamacion-description">
+				Cuéntanos cualquier inconveniente relacionado con tu visita, entradas, atención o experiencia durante el evento. Revisaremos tu caso con el equipo de Futbol Fest X.
+			</p>
+		</div>
+
+		<form class="reclamacion-form" action="#" method="post" data-futbolfest-reclamacion-form>
+			<div class="reclamacion-form-section">
+				<h2 class="reclamacion-form-title">Datos del consumidor</h2>
+
+				<div class="reclamacion-form-grid">
+					<label class="registro-field">
+						<span>Nombre completo</span>
+						<input type="text" name="reclamacion_nombre" autocomplete="given-name" required>
+					</label>
+
+					<label class="registro-field">
+						<span>Apellido completo</span>
+						<input type="text" name="reclamacion_apellido" autocomplete="family-name" required>
+					</label>
+
+					<label class="registro-field">
+						<span>Tipo de documento</span>
+						<select name="reclamacion_tipo_documento" required>
+							<option value="">Seleccionar</option>
+							<option value="dni">DNI</option>
+							<option value="ce">Carnet de extranjería</option>
+							<option value="pasaporte">Pasaporte</option>
+						</select>
+					</label>
+
+					<label class="registro-field">
+						<span>Número de documento</span>
+						<input type="text" name="reclamacion_documento" autocomplete="off" required>
+					</label>
+
+					<label class="registro-field">
+						<span>Email</span>
+						<input type="email" name="reclamacion_email" autocomplete="email" required>
+					</label>
+
+					<label class="registro-field">
+						<span>Celular</span>
+						<input type="tel" name="reclamacion_celular" inputmode="tel" autocomplete="tel" required>
+					</label>
+
+					<label class="registro-field reclamacion-field-full">
+						<span>Domicilio</span>
+						<input type="text" name="reclamacion_domicilio" autocomplete="street-address" required>
+					</label>
+				</div>
+			</div>
+
+			<div class="reclamacion-form-section">
+				<h2 class="reclamacion-form-title">Detalle de la reclamación</h2>
+
+				<div class="reclamacion-form-grid">
+					<label class="registro-field">
+						<span>Tipo de solicitud</span>
+						<select name="reclamacion_tipo_solicitud" required>
+							<option value="">Seleccionar</option>
+							<option value="reclamo">Reclamo</option>
+							<option value="queja">Queja</option>
+						</select>
+					</label>
+
+					<label class="registro-field">
+						<span>Fecha del hecho</span>
+						<input type="date" name="reclamacion_fecha" required>
+					</label>
+
+					<label class="registro-field reclamacion-field-full">
+						<span>Servicio relacionado</span>
+						<input type="text" name="reclamacion_servicio" placeholder="Ej. entrada, atención, estacionamiento, actividad o experiencia" required>
+					</label>
+
+					<label class="registro-field reclamacion-field-full">
+						<span>Descripción</span>
+						<textarea name="reclamacion_descripcion" rows="6" placeholder="Describe de forma clara lo ocurrido, indicando lugar, fecha, zona del evento o cualquier información que ayude a revisar tu caso." required></textarea>
+					</label>
+				</div>
+			</div>
+
+			<div class="reclamacion-actions">
+				<p class="reclamacion-note">Atenderemos tu solicitud conforme a los plazos establecidos por la normativa vigente.</p>
+				<button type="submit" class="btn btn-primary reclamacion-submit">ENVIAR RECLAMACIÓN</button>
+			</div>
+			<p class="reclamacion-message" data-futbolfest-reclamacion-message aria-live="polite"></p>
+		</form>
+	</div>
+</section>

@@ -4,6 +4,7 @@
  */
 
 require_once get_theme_file_path( 'inc/registro.php' );
+require_once get_theme_file_path( 'inc/reclamacion.php' );
 require_once get_theme_file_path( 'inc/routes.php' );
 
 // Cargar el CSS del tema

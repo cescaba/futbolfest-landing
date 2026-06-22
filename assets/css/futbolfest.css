@@ -908,6 +908,33 @@ body.futbolfest-modal-open {
 	color: #5A6A9A;
 }
 
+.reclamacion-message {
+	display: none;
+	margin: 0;
+	font-family: 'Barlow';
+	font-weight: 600;
+	font-size: 0.8125rem;
+	line-height: 18px;
+	text-align: center;
+}
+
+.reclamacion-message:not(:empty) {
+	display: block;
+	margin-top: 0.75rem;
+}
+
+.reclamacion-message[data-state="success"] {
+	color: #15803d;
+}
+
+.reclamacion-message[data-state="error"] {
+	color: #dc2626;
+}
+
+.reclamacion-message[data-state="loading"] {
+	color: #5A6A9A;
+}
+
 .registro-confirmacion[hidden] {
 	display: none;
 }
@@ -1718,6 +1745,192 @@ body.futbolfest-modal-open {
 }
 
 /* ============================================
+   RECLAMACION SECTION
+   ============================================ */
+.reclamacion-page-header {
+	width: 100%;
+	background-color: #ffffff;
+	border-bottom: 1px solid rgba(26, 63, 160, 0.1);
+}
+
+.reclamacion-page-header-inner {
+	width: min(100%, 1200px);
+	margin: 0 auto;
+	padding: 1rem 1.25rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.reclamacion-page-brand {
+	color: #152CA7;
+	font-family: 'Barlow Condensed';
+	font-weight: 900;
+	font-size: 1.75rem;
+	line-height: 1;
+	letter-spacing: 0;
+	text-decoration: none;
+	text-transform: uppercase;
+}
+
+.reclamacion-page-title {
+	margin: 0;
+	color: #0D1B4B;
+	font-family: 'Barlow';
+	font-weight: 800;
+	font-size: 0.95rem;
+	line-height: 18px;
+	letter-spacing: 0;
+	text-transform: uppercase;
+}
+
+.reclamacion-section {
+	background-color: #F5F7FC;
+	padding-top: 3rem;
+	padding-bottom: 3rem;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.reclamacion-container {
+	position: relative;
+	width: min(100%, 1200px);
+	background-color: #ffffff;
+	border: 1px solid rgba(26, 63, 160, 0.1);
+	border-radius: 18px;
+	box-shadow: 0 24px 54px rgba(13, 27, 75, 0.08);
+	padding: 2rem;
+}
+
+.reclamacion-intro {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	padding: 1.5rem;
+	margin-bottom: 1.5rem;
+	border: 1px solid rgba(26, 63, 160, 0.1);
+	border-radius: 16px;
+	background: linear-gradient(180deg, #FFFFFF 0%, #F7F9FF 100%);
+}
+
+.reclamacion-eyebrow {
+	margin: 0 0 0.35rem;
+	color: #F5A200;
+	font-family: 'Barlow';
+	font-weight: 800;
+	font-size: 0.75rem;
+	line-height: 16px;
+	letter-spacing: 2px;
+	text-transform: uppercase;
+}
+
+.reclamacion-heading {
+	font-family: 'Barlow Condensed';
+	font-weight: 900;
+	font-size: 3rem;
+	line-height: 48px;
+	letter-spacing: 0;
+	margin: 0 0 0.5rem;
+	color: #0D1B4B;
+	text-transform: uppercase;
+}
+
+.reclamacion-description {
+	max-width: 720px;
+	margin: 0;
+	color: #5A6A9A;
+	font-family: 'Barlow';
+	font-weight: 400;
+	font-size: 0.875rem;
+	line-height: 21px;
+	letter-spacing: 0;
+}
+
+.reclamacion-form {
+	min-width: 0;
+}
+
+.reclamacion-form-section {
+	padding: 1rem;
+	border: 1px solid rgba(26, 63, 160, 0.1);
+	border-radius: 14px;
+	background-color: #FBFCFF;
+}
+
+.reclamacion-form-section + .reclamacion-form-section {
+	margin-top: 1rem;
+}
+
+.reclamacion-form-title {
+	margin: 0 0 0.75rem;
+	color: #0D1B4B;
+	font-family: 'Barlow Condensed';
+	font-weight: 800;
+	font-size: 1.25rem;
+	line-height: 24px;
+	letter-spacing: 0;
+}
+
+.reclamacion-form-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.reclamacion-field-full {
+	grid-column: 1 / -1;
+}
+
+.registro-field textarea {
+	width: 100%;
+	min-height: 110px;
+	box-sizing: border-box;
+	resize: vertical;
+	border: 1px solid rgba(26, 63, 160, 0.18);
+	border-radius: 11px;
+	background: #F7F9FF;
+	padding: 0.75rem;
+	color: #0D1B4B;
+	font-family: 'Barlow';
+	font-weight: 400;
+	font-size: 0.875rem;
+	line-height: 20px;
+	outline: none;
+}
+
+.registro-field textarea:focus {
+	border-color: rgba(26, 63, 160, 0.45);
+}
+
+.reclamacion-submit {
+	width: 220px;
+	margin-top: 0;
+	background-color: #152CA7;
+	color: #ffffff;
+}
+
+.reclamacion-actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-top: 1rem;
+}
+
+.reclamacion-note {
+	margin: 0;
+	color: #5A6A9A;
+	font-family: 'Barlow';
+	font-weight: 400;
+	font-size: 0.75rem;
+	line-height: 17px;
+	letter-spacing: 0;
+}
+
+/* ============================================
    BUTTONS
    ============================================ */
 .btn {
@@ -1886,6 +2099,18 @@ body.futbolfest-modal-open {
 	display: block;
 }
 
+.futbolfest-footer-book-button {
+	display: inline-flex;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+}
+
+.futbolfest-footer-book-button:hover {
+	transform: translateY(-2px);
+}
+
 .futbolfest-footer-book {
 	width: 154px;
 	height: 86px;
@@ -1932,6 +2157,15 @@ section {
 		object-fit: cover;
 		object-position: 13% center;
 	}
+
+	.reclamacion-container {
+		padding: 1.5rem;
+	}
+
+	.reclamacion-form-grid {
+		grid-template-columns: 1fr;
+	}
+
 }
 
 /* ============================================
@@ -2601,6 +2835,54 @@ section {
 	.contacto-grid {
 		width: 100%;
 		min-width: 0;
+	}
+
+	.reclamacion-section {
+		padding-top: 2.5rem;
+		padding-bottom: 2.5rem;
+	}
+
+	.reclamacion-page-header-inner {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.reclamacion-container {
+		padding: 1rem;
+		border-radius: 16px;
+	}
+
+	.reclamacion-intro {
+		padding-bottom: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.reclamacion-heading {
+		font-size: 1.6875rem;
+		line-height: 27px;
+	}
+
+	.reclamacion-description {
+		max-width: none;
+		font-size: 0.8125rem;
+		line-height: 19px;
+	}
+
+	.reclamacion-form-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.reclamacion-form-section {
+		padding: 0.875rem;
+	}
+
+	.reclamacion-actions {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.reclamacion-submit {
+		width: 100%;
 	}
 
 	.ubicacion-heading {

@@ -317,8 +317,9 @@ function futbolfest_registro_enqueue_scripts() {
 		'futbolfest-registro',
 		'FutbolFestRegistro',
 		array(
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'futbolfest_registro_submit' ),
+			'ajaxUrl'           => admin_url( 'admin-ajax.php' ),
+			'nonce'             => wp_create_nonce( 'futbolfest_registro_submit' ),
+			'reclamacionNonce'  => wp_create_nonce( 'futbolfest_reclamacion_submit' ),
 		)
 	);
 }

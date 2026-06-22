@@ -205,6 +205,17 @@ body.futbolfest-modal-open {
 	letter-spacing: 0;
 }
 
+.hero-schedule {
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+	line-height: 0.95rem;
+}
+
+.hero-schedule span {
+	display: block;
+}
+
 .hero-buttons {
 	display: flex;
 	gap: 1.5rem;
@@ -2141,6 +2152,11 @@ section {
 		font-size: 0.75rem;
 		line-height: 16px;
 		letter-spacing: 0;
+	}
+
+	.hero-schedule {
+		gap: 0.1875rem;
+		line-height: 15px;
 	}
 
 	.hero-badges {

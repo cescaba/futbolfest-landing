@@ -603,7 +603,7 @@ function futbolfest_registro_send_confirmation_email( $email, $nombre, $apellido
 												<td width="30" align="center" valign="middle" style="padding:0;color:#0d1b4b;font-size:18px;line-height:27px;">📍</td>
 												<td align="left" valign="middle" style="padding:0 0 0 12px;">
 													<p style="margin:0 0 2px;color:#5a6a9a;font-size:12px;line-height:12px;font-weight:400;letter-spacing:0;">Nos vemos en</p>
-													<p style="margin:0;color:#0d1b4b;font-size:13px;line-height:20px;font-weight:700;letter-spacing:0;">Av. El Derby Puerta N.4 Jockey Club Surco</p>
+													<p style="margin:0;color:#0d1b4b;font-size:13px;line-height:20px;font-weight:700;letter-spacing:0;">Jockey Club - Puerta 4 (Av. El Derby S/N, puerta 4 Jockey Club, Surco, Lima Perú)</p>
 													<p style="margin:0;color:#152ca7;font-size:12px;line-height:17px;font-weight:600;letter-spacing:0;">17 de Julio hasta el 31 de Agosto 2026</p>
 												</td>
 											</tr>

@@ -264,6 +264,7 @@
 	function initReclamacionForm(form) {
 		var message = form.querySelector('[data-futbolfest-reclamacion-message]');
 		var submit = form.querySelector('button[type="submit"]');
+		var formRenderedAt = Math.floor(Date.now() / 1000);
 
 		function setMessage(text, type) {
 			if (!message) {
@@ -299,6 +300,7 @@
 			var payload = new FormData(form);
 			payload.append('action', 'futbolfest_reclamacion_submit');
 			payload.append('nonce', config.reclamacionNonce);
+			payload.append('form_rendered_at', formRenderedAt);
 
 			setLoading(true);
 			setMessage('Enviando reclamación...', 'loading');

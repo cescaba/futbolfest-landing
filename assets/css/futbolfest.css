@@ -291,7 +291,7 @@ body.futbolfest-modal-open {
 
 .registro-description {
 	color: #5A6A9A;
-	font-family: 'Barlow ';
+	font-family: 'Barlow';
 	font-weight: 400;
 	font-size: 0.8125rem;
 	line-height: 28px;
@@ -1628,7 +1628,7 @@ body.futbolfest-modal-open {
 }
 
 .contactoh2 {
-	font-family: 'Barlow';
+	font-family: var(--font-barlow);
 	font-weight: 700;
 	font-size: 0.6875rem;
 	line-height: 17px;
@@ -1639,7 +1639,7 @@ body.futbolfest-modal-open {
 
 .contacto-heading {
 	color: #FFFFFF;
-	font-family: 'Barlow Condensed';
+	font-family: 'Barlow Condensed', sans-serif;
 	font-size: 1.5rem;
 	font-weight: 900;
 	line-height: 22px;
@@ -1685,7 +1685,7 @@ body.futbolfest-modal-open {
 }
 
 .contacto-item h3 {
-	font-family: 'Barlow';
+	font-family: var(--font-barlow);
 	font-weight: 400;
 	font-size: 0.6875rem;
 	line-height: 17px;
@@ -1704,6 +1704,10 @@ body.futbolfest-modal-open {
 	align-items: center;
 	justify-content: space-between;
 	gap: 1rem;
+}
+
+.contacto-item-main>div {
+	min-width: 0;
 }
 
 .contacto-item-icon {
@@ -1725,7 +1729,7 @@ body.futbolfest-modal-open {
 }
 
 .contacto-item p {
-	font-family: 'Barlow';
+	font-family: var(--font-barlow);
 	font-weight: 700;
 	font-size: 0.875rem;
 	line-height: 21px;
@@ -1735,13 +1739,15 @@ body.futbolfest-modal-open {
 }
 
 .contacto-item p.subtitle {
-	font-family: 'Barlow';
+	font-family: var(--font-barlow);
 	font-weight: 400;
 	font-size: 0.75rem;
 	line-height: 17px;
 	letter-spacing: 0px;
 	color: #FFFFFF59;
 	margin: 0;
+	width: 100%;
+	max-width: 21rem;
 }
 
 /* ============================================
@@ -2009,7 +2015,7 @@ body.futbolfest-modal-open {
 	justify-content: center;
 	gap: 0.25rem;
 	padding: 0;
-	font-family: 'Barlow ';
+	font-family: var(--font-barlow);
 	font-weight: 700;
 	font-size: 0.6875rem;
 	line-height: 14px;
@@ -2745,7 +2751,7 @@ section {
 	.actividades-heading,
 	.ubicacion-heading,
 	.contacto-heading {
-		font-family: 'Barlow Condensed';
+		font-family: 'Barlow Condensed', sans-serif;
 		font-weight: 900;
 		font-size: 1.125rem;
 		line-height: 20px;
@@ -2816,7 +2822,7 @@ section {
 
 	/* UbicaciÃƒÂ³n y contacto */
 	.contactoh2 {
-		font-family: 'Barlow';
+		font-family: var(--font-barlow);
 		font-weight: 700;
 		font-size: 0.6875rem;
 		line-height: 17px;
@@ -2895,7 +2901,7 @@ section {
 	}
 
 	.contacto-item h3 {
-		font-family: 'Barlow';
+		font-family: var(--font-barlow);
 		font-weight: 400;
 		font-size: 0.6875rem;
 		line-height: 17px;
@@ -2923,7 +2929,7 @@ section {
 	}
 
 	.contacto-item p {
-		font-family: 'Barlow';
+		font-family: var(--font-barlow);
 		font-weight: 700;
 		font-size: 0.875rem;
 		line-height: 21px;
@@ -2932,17 +2938,18 @@ section {
 	}
 
 	.contacto-item p.subtitle {
-		font-family: 'Barlow';
+		font-family: var(--font-barlow);
 		font-weight: 400;
 		font-size: 0.75rem;
 		line-height: 17px;
 		letter-spacing: 0;
+		max-width: 100%;
 	}
 
 	.btn-call {
 		width: auto;
 		flex-shrink: 0;
-		font-family: 'Barlow';
+		font-family: var(--font-barlow);
 		font-weight: 700;
 		font-size: 0.75rem;
 		line-height: 18px;
